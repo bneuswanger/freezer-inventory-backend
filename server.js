@@ -16,17 +16,8 @@ app.use(express.urlencoded({ extended: false }))
 app.use('/api/items', require('./routes/itemRoutes'))
 app.use('/api/users', require('./routes/userRoutes'))
 
-//To test if backend deployment worked
+//To test if backend is running
 app.get('/test', (req, res) => { res.send('Hello! Express server is running!')})
-
-//Serve frontend
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'build')))
-
-  app.get('/*', (req, res) => res.sendFile(path.join(__dirname, 'build', 'index.html')))
-} else {
-    app.get('/', (req, res) => res.send('Please set to production') )
-}
 
 connectDB().then(() => {
     app.listen(port, () => {
