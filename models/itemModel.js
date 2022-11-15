@@ -34,6 +34,10 @@ const itemSchema = mongoose.Schema(
       required: true,
       ref: 'User',
     },
+    url: {
+      type: String,
+      required: [true, 'Need the image URL']
+    },
   },
   {
     timestamps: true,
