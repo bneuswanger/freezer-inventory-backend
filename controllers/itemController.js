@@ -1,12 +1,5 @@
 const asyncHandler = require('express-async-handler')
-const cloudinary = require('cloudinary').v2
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
-})
+const { cloudinary } = require('../utils/cloudinary')
 
 const Item = require('../models/itemModel')
 const User = require('../models/userModel')
@@ -14,7 +7,6 @@ const User = require('../models/userModel')
 // @desc    Get items
 // @route   GET /api/items
 // @access  Private
-
 const getItems = asyncHandler(async (req, res) => {
   const items = await Item.find({ user: req.user.id })
   res.status(200).json(items)
@@ -23,9 +15,8 @@ const getItems = asyncHandler(async (req, res) => {
 // @desc    Create item
 // @route   POST /api/items
 // @access  Private
-
 const createItem = asyncHandler(async (req, res) => {
-  if (!req.body.base64image) {
+  if (!req.body.image_data) {
     res.status(400)
     throw new Error('Please add a picture')
   }
@@ -54,12 +45,22 @@ const createItem = asyncHandler(async (req, res) => {
     throw new Error('Please specify the year of harvest')
   }
 
-  const fileStr = req.body.base64image
-  const cloudinaryResponse = await cloudinary.uploader.upload(fileStr, {
-    folder: 'freezer-inventory',
-    eager: [{ width: 250, aspect_ratio: 1, crop: 'fill', gravity: 'food', format: 'webp', quality: 90 }],
-  })
-  const cloudinaryUrl = cloudinaryResponse.eager[0].secure_url
+  let cloudinaryUrl
+  console.log('server received image request')
+  const fileStr = req.body.image_data
+  if (fileStr.includes('cloudinary')) {
+    const cloudinaryResponse = await cloudinary.uploader.explicit(req.body.public_id, {
+      type: 'upload',
+      eager: [{ width: 250, aspect_ratio: 1, crop: 'fill', gravity: 'food', format: 'webp', quality: 90 }],
+    })
+    cloudinaryUrl = cloudinaryResponse.eager[0].secure_url
+  } else {
+    const cloudinaryResponse = await cloudinary.uploader.upload(fileStr, {
+      folder: 'freezer-inventory',
+      eager: [{ width: 250, aspect_ratio: 1, crop: 'fill', gravity: 'food', format: 'webp', quality: 90 }],
+    })
+    cloudinaryUrl = cloudinaryResponse.eager[0].secure_url
+  }
 
   const item = await Item.create({
     description: req.body.description,
@@ -72,7 +73,7 @@ const createItem = asyncHandler(async (req, res) => {
     user: req.user.id,
     url: cloudinaryUrl,
   })
-  console.log(item)
+  console.log('Item created in database:'.red, item)
   res.status(200).json(item)
 })
 
@@ -126,6 +127,7 @@ const deleteItem = asyncHandler(async (req, res) => {
   }
 
   await item.deleteOne()
+  console.log('Deleted item'.red, item.description)
   res.status(200).json({ id: req.params.id })
 })
 
