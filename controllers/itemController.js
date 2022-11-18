@@ -46,7 +46,6 @@ const createItem = asyncHandler(async (req, res) => {
   }
 
   let cloudinaryUrl
-  console.log('server received image request')
   const fileStr = req.body.image_data
   if (fileStr.includes('cloudinary')) {
     const cloudinaryResponse = await cloudinary.uploader.explicit(req.body.public_id, {
@@ -83,7 +82,6 @@ const createItem = asyncHandler(async (req, res) => {
 
 const updateItem = asyncHandler(async (req, res) => {
   const item = await Item.findById(req.params.id)
-
   if (!item) {
     res.status(400)
     throw new Error('Item not found')
@@ -100,7 +98,32 @@ const updateItem = asyncHandler(async (req, res) => {
     throw new Error('User not authorized')
   }
 
-  const updatedItem = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true })
+  let cloudinaryUrl
+  const incomingImage = req.body.image_data
+
+  //Handle case: Image from Cloudinary is already resized.  No additional requests needed
+  if (incomingImage.includes('ar_1,c_fill')) {
+    cloudinaryUrl = req.body.url
+  }
+  //Handle case: Image from Cloudinary is not yet resized.  Request transformation from cloudinary.
+  if (incomingImage.includes('cloudinary') && !incomingImage.includes('ar_1,c_fill')) {
+    const cloudinaryResponse = await cloudinary.uploader.explicit(req.body.public_id, {
+      type: 'upload',
+      eager: [{ width: 250, aspect_ratio: 1, crop: 'fill', gravity: 'food', format: 'webp', quality: 90 }],
+    })
+    cloudinaryUrl = cloudinaryResponse.eager[0].secure_url
+  }
+  //Handle case: Image is from local source
+  if (incomingImage.includes('data:image') && incomingImage.includes('base64')) {
+    const cloudinaryResponse = await cloudinary.uploader.upload(incomingImage, {
+      folder: 'freezer-inventory',
+      eager: [{ width: 250, aspect_ratio: 1, crop: 'fill', gravity: 'food', format: 'webp', quality: 90 }],
+    })
+    cloudinaryUrl = cloudinaryResponse.eager[0].secure_url
+  }
+
+  const editedItem = { ...req.body, url: cloudinaryUrl }
+  const updatedItem = await Item.findByIdAndUpdate(req.params.id, editedItem, { new: true })
   res.status(200).json(updatedItem)
 })
 
@@ -127,7 +150,6 @@ const deleteItem = asyncHandler(async (req, res) => {
   }
 
   await item.deleteOne()
-  console.log('Deleted item'.red, item.description)
   res.status(200).json({ id: req.params.id })
 })
 
