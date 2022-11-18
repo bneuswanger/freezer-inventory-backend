@@ -72,7 +72,6 @@ const createItem = asyncHandler(async (req, res) => {
     user: req.user.id,
     url: cloudinaryUrl,
   })
-  console.log('Item created in database:'.red, item)
   res.status(200).json(item)
 })
 
